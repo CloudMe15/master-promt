@@ -284,6 +284,12 @@ export default async function handler(req, res) {
   }
 
   try {
+    let body = req.body;
+    if (typeof body === 'string') {
+      try {
+        body = JSON.parse(body);
+      } catch (_) {}
+    }
     const { 
       prompt, 
       language = 'id', 
@@ -294,7 +300,7 @@ export default async function handler(req, res) {
       devRole = 'fullstack',
       refinement = '', 
       previousPrompt = '' 
-    } = req.body || {};
+    } = body || {};
     
     if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
       return res.status(400).json({ error: 'Harap masukkan topik atau ide prompt terlebih dahulu.' });
