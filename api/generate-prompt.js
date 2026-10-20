@@ -1,13 +1,15 @@
 import { GoogleGenAI } from '@google/genai';
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
+function getAI(apiKey) {
+  return new GoogleGenAI({
+    apiKey,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
+      },
     },
-  },
-});
+  });
+}
 
 function buildSystemInstruction(language = 'id', tone = 'profesional', targetModel = 'Claude', framework = 'elite', techStack = 'auto', devRole = 'fullstack') {
   const isEn = language === 'en';
@@ -298,11 +300,14 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Harap masukkan topik atau ide prompt terlebih dahulu.' });
     }
 
-    if (!process.env.GEMINI_API_KEY) {
+    const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+    if (!apiKey) {
       return res.status(500).json({
         error: 'GEMINI_API_KEY belum dikonfigurasi di Environment Variables Vercel. Silakan tambahkan GEMINI_API_KEY di dashboard Vercel (Project Settings > Environment Variables).'
       });
     }
+
+    const ai = getAI(apiKey);
 
     let userContent = `Ide Prompt Pengembangan Web: ${prompt.trim()}`;
     if (techStack && techStack !== 'auto') {
@@ -320,17 +325,34 @@ export default async function handler(req, res) {
 
     const systemInstruction = buildSystemInstruction(language, tone, targetModel, framework, techStack, devRole);
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
-      contents: userContent,
-      config: {
-        systemInstruction,
-      },
-    });
+    const candidateModels = ['gemini-3.8-flash', 'gemini-3.5-flash', 'gemini-flash-latest'];
+    let generatedText = null;
+    let lastError = null;
 
-    const generatedText = response.text;
+    for (const modelName of candidateModels) {
+      try {
+        const response = await ai.models.generateContent({
+          model: modelName,
+          contents: userContent,
+          config: {
+            systemInstruction,
+          },
+        });
+        if (response && response.text) {
+          generatedText = response.text;
+          break;
+        }
+      } catch (err) {
+        console.warn(`Model ${modelName} returned error: ${err.message || err}. Trying next fallback...`);
+        lastError = err;
+        if (err.status === 400 || err.status === 401 || err.status === 403) {
+          throw err;
+        }
+      }
+    }
+
     if (!generatedText) {
-      throw new Error('Respon AI tidak menghasilkan teks.');
+      throw lastError || new Error('Respon AI tidak menghasilkan teks.');
     }
 
     return res.status(200).json({ text: generatedText, framework: framework });

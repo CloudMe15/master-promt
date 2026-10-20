@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = (process.env.PORT && process.env.PORT !== '8080') ? process.env.PORT : 3000;
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -25,11 +25,15 @@ app.get('*', (req, res) => {
   if (fs.existsSync(publicIndex)) {
     return res.sendFile(publicIndex);
   }
-  res.sendFile(path.join(__dirname, 'index.html'));
+  const rootIndex = path.join(__dirname, 'index.html');
+  if (fs.existsSync(rootIndex)) {
+    return res.sendFile(rootIndex);
+  }
+  res.status(404).send('index.html not found');
 });
 
 // In local dev and AI Studio, listen on port 3000
-if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+if (!process.env.VERCEL) {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Master Prompt Generator running on http://0.0.0.0:${PORT}`);
   });
