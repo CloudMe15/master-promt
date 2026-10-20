@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node server.js",
     "start": "node server.js",
-    "build": "node -e \"process.exit(0)\""
+    "build": "node -e \"const fs=require('fs'); fs.mkdirSync('public', {recursive: true}); fs.copyFileSync('index.html', 'public/index.html');\""
   },
   "dependencies": {
     "@google/genai": "latest",
