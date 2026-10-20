@@ -1,0 +1,7 @@
+{
+  "name": "Master Prompt Generator",
+  "description": "Generator Master Prompt komprehensif 6-bagian (Role, Task, Context, Reasoning, Stop conditions, Output) berbasis anatomi prompt terstruktur.",
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

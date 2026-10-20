@@ -1,0 +1,15 @@
+{
+  "name": "master-prompt-generator",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "build": "node -e \"process.exit(0)\""
+  },
+  "dependencies": {
+    "@google/genai": "latest",
+    "express": "^4.21.2"
+  }
+}
