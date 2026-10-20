@@ -3,10 +3,11 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "main": "index.js",
   "scripts": {
     "dev": "node server.js",
     "start": "node server.js",
-    "build": "node -e \"const fs=require('fs'); fs.mkdirSync('public', {recursive: true}); fs.copyFileSync('index.html', 'public/index.html');\""
+    "build": "node -e \"const fs=require('fs'); fs.mkdirSync('public', {recursive: true}); fs.copyFileSync('index.html', 'public/index.html'); if(fs.existsSync('index.js')) fs.copyFileSync('index.js', 'public/index.js'); if(fs.existsSync('server.js')) fs.copyFileSync('server.js', 'public/server.js');\""
   },
   "dependencies": {
     "@google/genai": "latest",
