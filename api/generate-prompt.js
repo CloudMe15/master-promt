@@ -306,10 +306,24 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Harap masukkan topik atau ide prompt terlebih dahulu.' });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+    try {
+      if (typeof process.loadEnvFile === 'function') {
+        process.loadEnvFile();
+      }
+    } catch (_) {}
+
+    const apiKey =
+      process.env.GEMINI_API_KEY ||
+      process.env.Gemini_Key ||
+      process.env.GEMINI_KEY ||
+      process.env.gemini_key ||
+      process.env.API_KEY ||
+      process.env.GOOGLE_API_KEY ||
+      process.env.GOOGLE_GENAI_API_KEY;
+
     if (!apiKey) {
       return res.status(500).json({
-        error: 'GEMINI_API_KEY belum dikonfigurasi di Environment Variables Vercel. Silakan tambahkan GEMINI_API_KEY di dashboard Vercel (Project Settings > Environment Variables).'
+        error: 'GEMINI_API_KEY atau Gemini_Key belum terdeteksi di Environment Variables. Pastikan nama variabel adalah GEMINI_API_KEY atau Gemini_Key, dan centang Production, Preview, serta Development di Vercel.'
       });
     }
 
@@ -331,7 +345,7 @@ export default async function handler(req, res) {
 
     const systemInstruction = buildSystemInstruction(language, tone, targetModel, framework, techStack, devRole);
 
-    const candidateModels = ['gemini-3.8-flash', 'gemini-3.5-flash', 'gemini-flash-latest'];
+    const candidateModels = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
     let generatedText = null;
     let lastError = null;
 
