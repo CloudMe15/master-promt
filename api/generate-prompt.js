@@ -292,6 +292,7 @@ export default async function handler(req, res) {
       } catch (_) {}
     }
     const { 
+      action = 'generate',
       prompt, 
       language = 'id', 
       tone = 'profesional', 
@@ -300,12 +301,15 @@ export default async function handler(req, res) {
       techStack = 'auto',
       devRole = 'fullstack',
       refinement = '', 
-      previousPrompt = '' 
+      previousPrompt = '',
+      // for section regeneration
+      sectionTitle = '',
+      currentContent = '',
+      sectionInstruction = '',
+      // for simulation
+      systemPrompt = '',
+      testInput = ''
     } = body || {};
-    
-    if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
-      return res.status(400).json({ error: 'Harap masukkan topik atau ide prompt terlebih dahulu.' });
-    }
 
     try {
       if (typeof process.loadEnvFile === 'function') {
@@ -329,6 +333,105 @@ export default async function handler(req, res) {
     }
 
     const ai = getAI(apiKey);
+    // Highest quality flagship: Gemini 4 Argon first, then Gemini 3.8 Flash, then resilient Gemini 3.1 Flash Lite
+    const candidateModels = ['gemini-4-argon', 'gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+
+    // ACTION 1: SIMULATE TEST RUN
+    if (action === 'simulate') {
+      if (!testInput || !testInput.trim()) {
+        return res.status(400).json({ error: 'Harap masukkan contoh input untuk simulasi uji coba.' });
+      }
+
+      let simText = null;
+      let lastErr = null;
+      let modelUsed = null;
+
+      for (const modelName of candidateModels) {
+        try {
+          const config = {
+            systemInstruction: systemPrompt || 'You are an expert AI executing the provided master instructions precisely.',
+          };
+          if (modelName === 'gemini-4-argon' || modelName.includes('3.8')) {
+            config.thinkingConfig = { thinkingLevel: 'LOW' };
+          }
+          const response = await ai.models.generateContent({
+            model: modelName,
+            contents: testInput.trim(),
+            config,
+          });
+          if (response && response.text) {
+            simText = response.text;
+            modelUsed = modelName;
+            break;
+          }
+        } catch (err) {
+          lastErr = err;
+        }
+      }
+
+      if (!simText) {
+        throw lastErr || new Error('Gagal mensimulasikan prompt dengan AI.');
+      }
+
+      return res.status(200).json({ result: simText, modelUsed });
+    }
+
+    // ACTION 2: REGENERATE / STRENGTHEN SECTION
+    if (action === 'regenerate-section') {
+      if (!sectionTitle) {
+        return res.status(400).json({ error: 'Nama bagian tidak valid.' });
+      }
+
+      const secInstruction = `Anda adalah Principal Prompt Engineer.
+Tugas Anda adalah memperkuat atau menulis ulang satu bagian spesifik dari Master Prompt ini: "${sectionTitle}".
+${sectionInstruction ? `Petunjuk Khusus: ${sectionInstruction}` : 'Tingkatkan ketajaman, ketiadaan ambiguitas, dan tingkat defensif bagian ini.'}
+Konteks Keseluruhan Master Prompt:
+${previousPrompt ? previousPrompt.slice(0, 1500) : ''}
+
+Isi Bagian Sebelumnya:
+${currentContent}
+
+Keluarkan HANYA isi bagian baru tersebut (tanpa menyertakan judul "### ${sectionTitle}", langsung isi kontennya dalam format Markdown rapi).`;
+
+      let secText = null;
+      let lastErr = null;
+      let modelUsed = null;
+
+      for (const modelName of candidateModels) {
+        try {
+          const config = {
+            systemInstruction: secInstruction,
+          };
+          if (modelName === 'gemini-4-argon' || modelName.includes('3.8')) {
+            config.thinkingConfig = { thinkingLevel: 'LOW' };
+          }
+
+          const response = await ai.models.generateContent({
+            model: modelName,
+            contents: `Tolong perkuat bagian ${sectionTitle} ini agar standar enterprise dan bebas celah.`,
+            config,
+          });
+          if (response && response.text) {
+            secText = response.text;
+            modelUsed = modelName;
+            break;
+          }
+        } catch (err) {
+          lastErr = err;
+        }
+      }
+
+      if (!secText) {
+        throw lastErr || new Error('Gagal memperkuat bagian ini.');
+      }
+
+      return res.status(200).json({ content: secText.trim(), modelUsed });
+    }
+
+    // ACTION 3: STANDARD MASTER PROMPT GENERATION
+    if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
+      return res.status(400).json({ error: 'Harap masukkan topik atau ide prompt terlebih dahulu.' });
+    }
 
     let userContent = `Ide Prompt Pengembangan Web: ${prompt.trim()}`;
     if (techStack && techStack !== 'auto') {
@@ -346,16 +449,16 @@ export default async function handler(req, res) {
 
     const systemInstruction = buildSystemInstruction(language, tone, targetModel, framework, techStack, devRole);
 
-    const candidateModels = ['gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-flash-latest'];
     let generatedText = null;
     let lastError = null;
+    let modelUsed = null;
 
     for (const modelName of candidateModels) {
       try {
         const config = {
           systemInstruction,
         };
-        if (modelName.includes('3.8')) {
+        if (modelName === 'gemini-4-argon' || modelName.includes('3.8')) {
           config.thinkingConfig = { thinkingLevel: 'LOW' };
         }
 
@@ -366,6 +469,7 @@ export default async function handler(req, res) {
         });
         if (response && response.text) {
           generatedText = response.text;
+          modelUsed = modelName;
           break;
         }
       } catch (err) {
@@ -381,7 +485,11 @@ export default async function handler(req, res) {
       throw lastError || new Error('Respon AI tidak menghasilkan teks.');
     }
 
-    return res.status(200).json({ text: generatedText, framework: framework });
+    return res.status(200).json({ 
+      text: generatedText, 
+      framework: framework,
+      modelUsed: modelUsed
+    });
   } catch (error) {
     console.error('Error in /api/generate-prompt:', error);
     return res.status(500).json({
