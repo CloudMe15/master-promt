@@ -462,7 +462,7 @@ export default function App() {
             </button>
             <div className="hidden sm:flex items-center gap-1.5 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700/60 text-slate-300">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span className="text-xs font-mono">Gemini 3.8 Flash</span>
+              <span className="text-xs font-mono">Gemini AI Aktif</span>
             </div>
           </div>
         </div>

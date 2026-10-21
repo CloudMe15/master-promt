@@ -7,6 +7,7 @@ function getAI(apiKey) {
       headers: {
         'User-Agent': 'aistudio-build',
       },
+      timeout: 35000,
     },
   });
 }
@@ -345,18 +346,23 @@ export default async function handler(req, res) {
 
     const systemInstruction = buildSystemInstruction(language, tone, targetModel, framework, techStack, devRole);
 
-    const candidateModels = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+    const candidateModels = ['gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-flash-latest'];
     let generatedText = null;
     let lastError = null;
 
     for (const modelName of candidateModels) {
       try {
+        const config = {
+          systemInstruction,
+        };
+        if (modelName.includes('3.8')) {
+          config.thinkingConfig = { thinkingLevel: 'LOW' };
+        }
+
         const response = await ai.models.generateContent({
           model: modelName,
           contents: userContent,
-          config: {
-            systemInstruction,
-          },
+          config,
         });
         if (response && response.text) {
           generatedText = response.text;
